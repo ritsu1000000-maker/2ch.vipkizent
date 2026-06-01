@@ -1,0 +1,184 @@
+<div class="simple-board">
+  <h3 class="board-title">改善してほしいところ(仮)</h3>
+  
+  <form id="post-form" class="board-form">
+    <div class="form-row">
+      <input type="text" id="post-name" placeholder="お名前（名無し可）" class="name-input">
+    </div>
+    <div class="form-row">
+      <textarea id="post-message" rows="3" required placeholder="追加してほしい機能などを書いてください..." class="message-input"></textarea>
+    </div>
+    <button type="submit" class="submit-btn">投稿する</button>
+  </form>
+
+  <div id="board-posts" class="posts-container">
+    </div>
+</div>
+
+<style>
+  /* 掲示板のデザイン */
+  .simple-board {
+    max-width: 600px;
+    margin: 20px auto;
+    font-family: sans-serif;
+    color: #333;
+  }
+  .board-title {
+    border-bottom: 2px solid #0056b3;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+  }
+  .board-form {
+    background: #f4f7f6;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+  }
+  .form-row {
+    margin-bottom: 10px;
+  }
+  .name-input, .message-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-family: inherit;
+  }
+  .message-input {
+    resize: vertical;
+  }
+  .submit-btn {
+    background-color: #0056b3;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  .submit-btn:hover {
+    background-color: #004494;
+  }
+  
+  /* 投稿内容のデザイン */
+  .post {
+    border: 1px solid #ddd;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .post-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    font-size: 0.9em;
+    color: #666;
+  }
+  .post-name {
+    font-weight: bold;
+    color: #222;
+  }
+  .post-body {
+    margin-bottom: 15px;
+    line-height: 1.5;
+    white-space: pre-wrap; /* 改行を反映する */
+  }
+  .vote-btn {
+    background: #eef2f5;
+    border: 1px solid #ccd6dd;
+    padding: 6px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    color: #0056b3;
+    font-weight: bold;
+    transition: 0.2s;
+  }
+  .vote-btn:hover {
+    background: #e1e8ed;
+  }
+</style>
+
+<script>
+  // 投稿データを保存する配列（ブラウザの保存領域から読み込み）
+  let posts = JSON.parse(localStorage.getItem('simpleBoardData')) || [];
+
+  // 投稿を画面に表示する関数
+  function renderPosts() {
+    const board = document.getElementById('board-posts');
+    board.innerHTML = ''; // 一旦クリア
+
+    if (posts.length === 0) {
+      board.innerHTML = '<p style="color:#999; text-align:center;">まだ投稿はありません。</p>';
+      return;
+    }
+
+    posts.forEach((post, index) => {
+      const postEl = document.createElement('div');
+      postEl.className = 'post';
+      postEl.innerHTML = `
+        <div class="post-header">
+          <span class="post-name">${escapeHTML(post.name) || '名無しさん'}</span>
+          <span class="post-date">${post.date}</span>
+        </div>
+        <div class="post-body">${escapeHTML(post.message)}</div>
+        <div class="post-footer">
+          <button class="vote-btn" onclick="vote(${index})">
+            👍 賛成・いいね <span class="vote-count">${post.votes}</span>
+          </button>
+        </div>
+      `;
+      board.appendChild(postEl);
+    });
+  }
+
+  // 投稿ボタンが押された時の処理
+  document.getElementById('post-form').addEventListener('submit', function(e) {
+    e.preventDefault(); // 画面の更新を防ぐ
+    
+    const nameInput = document.getElementById('post-name').value;
+    const messageInput = document.getElementById('post-message').value;
+    
+    // 現在の日付を取得
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()} ${now.getHours()}:${now.getMinutes()}`;
+
+    // 新しい投稿データを一番上に追加
+    posts.unshift({
+      name: nameInput,
+      message: messageInput,
+      date: dateStr,
+      votes: 0
+    });
+
+    saveAndRender();
+    this.reset(); // フォームを空にする
+  });
+
+  // 投票（いいね）ボタンが押された時の処理
+  function vote(index) {
+    posts[index].votes += 1; // 票数を1増やす
+    saveAndRender();
+  }
+
+  // データを保存して画面を更新する関数
+  function saveAndRender() {
+    // ブラウザのLocalStorageに保存（リロードしても消えないように）
+    localStorage.setItem('simpleBoardData', JSON.stringify(posts));
+    renderPosts();
+  }
+
+  // セキュリティ対策：HTMLタグを無効化する関数
+  function escapeHTML(str) {
+    return str.replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#39;');
+  }
+
+  // 最初に画面を開いた時に投稿を表示
+  renderPosts();
+</script>
