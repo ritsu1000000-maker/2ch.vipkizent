@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>要望・改善 掲示板</title>
   <style>
-    /* 掲示板のデザイン（前回と同じです） */
+    /* 掲示板のデザイン */
     .simple-board { max-width: 600px; margin: 20px auto; font-family: sans-serif; color: #333; }
     .board-title { border-bottom: 2px solid #0056b3; padding-bottom: 10px; margin-bottom: 20px; }
     .board-form { background: #f4f7f6; padding: 15px; border-radius: 8px; margin-bottom: 30px; }
@@ -19,8 +19,14 @@
     .post-header { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.9em; color: #666; }
     .post-name { font-weight: bold; color: #222; }
     .post-body { margin-bottom: 15px; line-height: 1.5; white-space: pre-wrap; }
+    
+    /* 通常のいいねボタン */
     .vote-btn { background: #eef2f5; border: 1px solid #ccd6dd; padding: 6px 12px; border-radius: 20px; cursor: pointer; color: #0056b3; font-weight: bold; transition: 0.2s; }
     .vote-btn:hover { background: #e1e8ed; }
+    
+    /* いいね済みの時のデザイン */
+    .vote-btn.voted { background: #e2f0fd; border-color: #3b82f6; color: #1d4ed8; }
+    .vote-btn.voted:hover { background: #dbeafe; }
   </style>
 </head>
 <body>
@@ -44,11 +50,9 @@
 </div>
 
 <script type="module">
-  // 1. Firebaseの基本機能とFirestore（データベース）をインポート
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
   import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-  // 2. 教えてもらった設定コード
   const firebaseConfig = {
     apiKey: "AIzaSyBCQArL0Q1wDveRywCpet5Nor3PuRYt7fM",
     authDomain: "sabopennet.firebaseapp.com",
@@ -59,13 +63,14 @@
     measurementId: "G-K17XRK5KRN"
   };
 
-  // 3. Firebaseとデータベース（Firestore）の初期化
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
-  // 4. データベースからリアルタイムで投稿を読み込む
   const postsCollection = collection(db, "posts");
-  const q = query(postsCollection, orderBy("createdAt", "desc")); // 新しい順に並べる
+  const q = query(postsCollection, orderBy("createdAt", "desc"));
+
+  // 自分がいいねした投稿のIDリストをブラウザから読み込む
+  let myVotedPosts = JSON.parse(localStorage.getItem('myVotedPosts')) || [];
 
   onSnapshot(q, (snapshot) => {
     const board = document.getElementById('board-posts');
@@ -78,16 +83,19 @@
 
     snapshot.forEach((docSnap) => {
       const post = docSnap.data();
-      const id = docSnap.id; // Firestoreが自動で作るID
+      const id = docSnap.id;
 
-      // 投稿日時のフォーマット
+      // すでにいいねしているか判定
+      const isVoted = myVotedPosts.includes(id);
+      const btnText = isVoted ? "👎 いいねを取り消す" : "👍 賛成・いいね";
+      const btnClass = isVoted ? "vote-btn voted" : "vote-btn";
+
       let dateStr = "日付取得中...";
       if (post.createdAt) {
         const date = post.createdAt.toDate();
         dateStr = `${date.getFullYear()}/${date.getMonth()+1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
       }
 
-      // HTMLの作成
       const postEl = document.createElement('div');
       postEl.className = 'post';
       postEl.innerHTML = `
@@ -97,8 +105,8 @@
         </div>
         <div class="post-body">${escapeHTML(post.message)}</div>
         <div class="post-footer">
-          <button class="vote-btn" onclick="vote('${id}', ${post.votes})">
-            👍 賛成・いいね <span class="vote-count">${post.votes}</span>
+          <button class="${btnClass}" onclick="toggleVote('${id}', ${post.votes})">
+            ${btnText} <span class="vote-count">${post.votes}</span>
           </button>
         </div>
       `;
@@ -106,11 +114,10 @@
     });
   });
 
-  // 5. 投稿ボタンが押された時の処理（データベースに保存）
   document.getElementById('post-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     const btn = document.getElementById('submit-btn');
-    btn.disabled = true; // 連打防止
+    btn.disabled = true;
     
     const nameInput = document.getElementById('post-name').value;
     const messageInput = document.getElementById('post-message').value;
@@ -120,9 +127,9 @@
         name: nameInput,
         message: messageInput,
         votes: 0,
-        createdAt: serverTimestamp() // サーバーの正確な時間を記録
+        createdAt: serverTimestamp()
       });
-      this.reset(); // フォームを空にする
+      this.reset();
     } catch (error) {
       console.error("エラー:", error);
       alert("投稿に失敗しました。");
@@ -131,19 +138,35 @@
     }
   });
 
-  // 6. 投票（いいね）ボタンの処理
-  window.vote = async function(id, currentVotes) {
+  // いいねの追加・取り消しを切り替えるトグル関数
+  window.toggleVote = async function(id, currentVotes) {
     const postRef = doc(db, "posts", id);
+    const index = myVotedPosts.indexOf(id);
+    let newVotes = currentVotes;
+
+    if (index > -1) {
+      // すでにいいねしている場合 → 取り消す（マイナス1）
+      newVotes = Math.max(0, currentVotes - 1); // 0未満にならないようにガード
+      myVotedPosts.splice(index, 1); // リストから削除
+    } else {
+      // まだいいねしていない場合 → いいねする（プラス1）
+      newVotes = currentVotes + 1;
+      myVotedPosts.push(id); // リストに追加
+    }
+
+    // 自分のいいね状態をブラウザに保存
+    localStorage.setItem('myVotedPosts', JSON.stringify(myVotedPosts));
+
+    // データベース（Firestore）の値を更新
     try {
       await updateDoc(postRef, {
-        votes: currentVotes + 1
+        votes: newVotes
       });
     } catch (error) {
       console.error("エラー:", error);
     }
   };
 
-  // セキュリティ対策（前回と同じ）
   function escapeHTML(str) {
     if (!str) return '';
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
