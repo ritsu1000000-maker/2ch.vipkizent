@@ -1,177 +1,127 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>要望・改善 掲示板</title>
-  <style>
-    /* 掲示板のデザイン */
-    .simple-board { max-width: 600px; margin: 20px auto; font-family: sans-serif; color: #333; }
-    .board-title { border-bottom: 2px solid #0056b3; padding-bottom: 10px; margin-bottom: 20px; }
-    .board-form { background: #f4f7f6; padding: 15px; border-radius: 8px; margin-bottom: 30px; }
-    .form-row { margin-bottom: 10px; }
-    .name-input, .message-input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-family: inherit; }
-    .message-input { resize: vertical; }
-    .submit-btn { background-color: #0056b3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-    .submit-btn:hover { background-color: #004494; }
-    
-    .post { border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 15px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .post-header { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.9em; color: #666; }
-    .post-name { font-weight: bold; color: #222; }
-    .post-body { margin-bottom: 15px; line-height: 1.5; white-space: pre-wrap; }
-    
-    /* 通常のいいねボタン */
-    .vote-btn { background: #eef2f5; border: 1px solid #ccd6dd; padding: 6px 12px; border-radius: 20px; cursor: pointer; color: #0056b3; font-weight: bold; transition: 0.2s; }
-    .vote-btn:hover { background: #e1e8ed; }
-    
-    /* いいね済みの時のデザイン */
-    .vote-btn.voted { background: #e2f0fd; border-color: #3b82f6; color: #1d4ed8; }
-    .vote-btn.voted:hover { background: #dbeafe; }
-  </style>
-</head>
-<body>
-
-<div class="simple-board">
-  <h3 class="board-title">要望・改善 掲示板</h3>
+<div class="anonymous-suggestion-box">
+  <h3 class="suggestion-title">要望・改善箱</h3>
+  <p class="suggestion-desc">
+    2ch.vipをご利用いただきありがとうございます！<br>
+    追加してほしい機能や、修正してほしいバグ、改善点などがあればお気軽に送信してください。
+    <span class="highlight">※完全匿名で送信され、メールアドレスなどは収集されません。</span>
+  </p>
   
-  <form id="post-form" class="board-form">
-    <div class="form-row">
-      <input type="text" id="post-name" placeholder="お名前（名無し可）" class="name-input">
+  <form action="https://formspree.io/f/mqejvdop" method="POST" class="suggestion-form">
+    
+    <div class="form-group">
+      <label for="board">対象の板・ページ（任意）</label>
+      <input type="text" id="board" name="対象の板・ページ" placeholder="例: なんでも実況J、トップページ など">
     </div>
-    <div class="form-row">
-      <textarea id="post-message" rows="3" required placeholder="追加してほしい機能などを書いてください..." class="message-input"></textarea>
-    </div>
-    <button type="submit" class="submit-btn" id="submit-btn">投稿する</button>
-  </form>
 
-  <div id="board-posts" class="posts-container">
-    <p style="color:#999; text-align:center;">読み込み中...</p>
-  </div>
+    <div class="form-group">
+      <label for="category">カテゴリ（必須）</label>
+      <select id="category" name="カテゴリ" required>
+        <option value="機能追加の要望">新機能の追加要望</option>
+        <option value="不具合・バグ報告">不具合・バグ報告</option>
+        <option value="デザイン・UI改善">デザイン・UI改善</option>
+        <option value="その他">その他</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="message">内容（必須）</label>
+      <textarea id="message" name="要望内容" rows="6" required placeholder="追加してほしい機能や、改善してほしいところを具体的に書いてもらえると嬉しいです！"></textarea>
+    </div>
+
+    <button type="submit" class="submit-btn">匿名で送信する</button>
+  </form>
 </div>
 
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyBCQArL0Q1wDveRywCpet5Nor3PuRYt7fM",
-    authDomain: "sabopennet.firebaseapp.com",
-    projectId: "sabopennet",
-    storageBucket: "sabopennet.firebasestorage.app",
-    messagingSenderId: "284308308452",
-    appId: "1:284308308452:web:e36dd991e55a0e60e4c7f1",
-    measurementId: "G-K17XRK5KRN"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
-  const postsCollection = collection(db, "posts");
-  const q = query(postsCollection, orderBy("createdAt", "desc"));
-
-  // 自分がいいねした投稿のIDリストをブラウザから読み込む
-  let myVotedPosts = JSON.parse(localStorage.getItem('myVotedPosts')) || [];
-
-  onSnapshot(q, (snapshot) => {
-    const board = document.getElementById('board-posts');
-    board.innerHTML = ''; 
-
-    if (snapshot.empty) {
-      board.innerHTML = '<p style="color:#999; text-align:center;">まだ投稿はありません。</p>';
-      return;
-    }
-
-    snapshot.forEach((docSnap) => {
-      const post = docSnap.data();
-      const id = docSnap.id;
-
-      // すでにいいねしているか判定
-      const isVoted = myVotedPosts.includes(id);
-      const btnText = isVoted ? "👎 いいねを取り消す" : "👍 賛成・いいね";
-      const btnClass = isVoted ? "vote-btn voted" : "vote-btn";
-
-      let dateStr = "日付取得中...";
-      if (post.createdAt) {
-        const date = post.createdAt.toDate();
-        dateStr = `${date.getFullYear()}/${date.getMonth()+1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
-      }
-
-      const postEl = document.createElement('div');
-      postEl.className = 'post';
-      postEl.innerHTML = `
-        <div class="post-header">
-          <span class="post-name">${escapeHTML(post.name) || '名無しさん'}</span>
-          <span class="post-date">${dateStr}</span>
-        </div>
-        <div class="post-body">${escapeHTML(post.message)}</div>
-        <div class="post-footer">
-          <button class="${btnClass}" onclick="toggleVote('${id}', ${post.votes})">
-            ${btnText} <span class="vote-count">${post.votes}</span>
-          </button>
-        </div>
-      `;
-      board.appendChild(postEl);
-    });
-  });
-
-  document.getElementById('post-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const btn = document.getElementById('submit-btn');
-    btn.disabled = true;
-    
-    const nameInput = document.getElementById('post-name').value;
-    const messageInput = document.getElementById('post-message').value;
-
-    try {
-      await addDoc(postsCollection, {
-        name: nameInput,
-        message: messageInput,
-        votes: 0,
-        createdAt: serverTimestamp()
-      });
-      this.reset();
-    } catch (error) {
-      console.error("エラー:", error);
-      alert("投稿に失敗しました。");
-    } finally {
-      btn.disabled = false;
-    }
-  });
-
-  // いいねの追加・取り消しを切り替えるトグル関数
-  window.toggleVote = async function(id, currentVotes) {
-    const postRef = doc(db, "posts", id);
-    const index = myVotedPosts.indexOf(id);
-    let newVotes = currentVotes;
-
-    if (index > -1) {
-      // すでにいいねしている場合 → 取り消す（マイナス1）
-      newVotes = Math.max(0, currentVotes - 1); // 0未満にならないようにガード
-      myVotedPosts.splice(index, 1); // リストから削除
-    } else {
-      // まだいいねしていない場合 → いいねする（プラス1）
-      newVotes = currentVotes + 1;
-      myVotedPosts.push(id); // リストに追加
-    }
-
-    // 自分のいいね状態をブラウザに保存
-    localStorage.setItem('myVotedPosts', JSON.stringify(myVotedPosts));
-
-    // データベース（Firestore）の値を更新
-    try {
-      await updateDoc(postRef, {
-        votes: newVotes
-      });
-    } catch (error) {
-      console.error("エラー:", error);
-    }
-  };
-
-  function escapeHTML(str) {
-    if (!str) return '';
-    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+<style>
+  /* 要望・改善箱の専用スタイリング */
+  .anonymous-suggestion-box {
+    max-width: 600px;
+    margin: 20px auto;
+    padding: 25px;
+    background-color: #fafafa;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
   }
-</script>
 
-</body>
-</html>
+  .suggestion-title {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.25em;
+    color: #990000; /* 2chの伝統的な赤系アクセント */
+    border-bottom: 2px solid #990000;
+    padding-bottom: 5px;
+    font-weight: bold;
+  }
+
+  .suggestion-desc {
+    font-size: 0.85em;
+    color: #555;
+    line-height: 1.6;
+    margin-bottom: 25px;
+  }
+
+  .suggestion-desc .highlight {
+    display: block;
+    margin-top: 5px;
+    color: #d32f2f;
+    font-weight: bold;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 7px;
+    font-size: 0.9em;
+    font-weight: bold;
+    color: #333;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    box-sizing: border-box;
+    font-family: inherit;
+    font-size: 0.95em;
+    background-color: #fff;
+    transition: border-color 0.2s;
+  }
+
+  .form-group input:focus,
+  .form-group select:focus,
+  .form-group textarea:focus {
+    border-color: #990000;
+    outline: none;
+  }
+
+  .form-group textarea {
+    resize: vertical;
+    min-height: 100px;
+  }
+
+  .submit-btn {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    background-color: #0044cc; /* 送信は目立つ青 */
+    color: #ffffff;
+    border: none;
+    border-radius: 3px;
+    font-size: 1em;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .submit-btn:hover {
+    background-color: #0033aa;
+  }
+</style>
