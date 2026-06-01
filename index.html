@@ -1,127 +1,237 @@
-<div class="anonymous-suggestion-box">
-  <h3 class="suggestion-title">要望・改善箱</h3>
-  <p class="suggestion-desc">
-    2ch.vipをご利用いただきありがとうございます！<br>
-    追加してほしい機能や、修正してほしいバグ、改善点などがあればお気軽に送信してください。
-    <span class="highlight">※完全匿名で送信され、メールアドレスなどは収集されません。</span>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>要望・改善 投票掲示板</title>
+  <style>
+    /* 全体のデザイン */
+    .poll-board { max-width: 650px; margin: 20px auto; font-family: "Helvetica Neue", Arial, sans-serif; color: #333; line-height: 1.6; }
+    .board-title { border-bottom: 2px solid #990000; padding-bottom: 10px; margin-bottom: 20px; color: #990000; font-size: 1.3em; }
+    .board-desc { font-size: 0.85em; color: #666; margin-bottom: 25px; }
+
+    /* フォームのデザイン */
+    .poll-form { background: #fafafa; padding: 20px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 30px; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9em; }
+    .input-field { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-family: inherit; font-size: 0.95em; }
+    .submit-btn { background-color: #0044cc; color: white; border: none; padding: 12px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 1em; transition: 0.2s; }
+    .submit-btn:hover { background-color: #0033aa; }
+
+    /* 投票項目（アンケートカード）のデザイン */
+    .poll-container { border-top: 2px dashed #ccc; padding-top: 20px; }
+    .poll-item { border: 1px solid #e0e0e0; padding: 20px; border-radius: 8px; margin-bottom: 20px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+    .poll-question { font-weight: bold; font-size: 1.1em; margin-bottom: 15px; color: #111; }
+    .poll-meta { font-size: 0.8em; color: #888; margin-bottom: 15px; }
+
+    /* 選択肢と投票率バー */
+    .poll-option-wrapper { margin-bottom: 12px; position: relative; cursor: pointer; }
+    .poll-option-clickarea { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; border: 1px solid #ccd6dd; border-radius: 6px; background: #fff; font-size: 0.95em; position: relative; z-index: 2; transition: 0.2s; }
+    .poll-option-wrapper:hover .poll-option-clickarea { border-color: #0044cc; background: #f7fafc; }
+    
+    /* 自分が投票した選択肢 */
+    .poll-option-wrapper.voted .poll-option-clickarea { border-color: #0044cc; font-weight: bold; color: #0044cc; }
+
+    /* 得票数のパーセンテージバー */
+    .poll-bar { position: absolute; top: 1px; left: 1px; bottom: 1px; background: #e2f0fd; border-radius: 5px 0 0 5px; z-index: 1; transition: width 0.6s cubic-bezier(0.1, 0.8, 0.3, 1); }
+    .poll-option-wrapper.voted .poll-bar { background: #bee3f8; }
+    
+    .vote-text { display: flex; align-items: center; gap: 8px; }
+    .vote-count { font-size: 0.9em; color: #555; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<div class="poll-board">
+  <h3 class="board-title">機能要望アンケート・投票箱</h3>
+  <p class="board-desc">
+    追加してほしい機能のアイデアを投稿したり、他ユーザーが提案したアイデアに投票（回答）したりできます。<br>
+    ※投票は1つのアンケートにつき1つの選択肢まで選べます（選択し直すと上書きされます）。
   </p>
   
-  <form action="https://formspree.io/f/mqejvdop" method="POST" class="suggestion-form">
-    
+  <form id="poll-create-form" class="poll-form">
     <div class="form-group">
-      <label for="board">対象の板・ページ（任意）</label>
-      <input type="text" id="board" name="対象の板・ページ" placeholder="例: なんでも実況J、トップページ など">
+      <label for="poll-title">提案したい機能や議題（必須）</label>
+      <input type="text" id="poll-title" class="input-field" required placeholder="例: 夜間モード（ダークテーマ）を追加してほしい">
     </div>
-
     <div class="form-group">
-      <label for="category">カテゴリ（必須）</label>
-      <select id="category" name="カテゴリ" required>
-        <option value="機能追加の要望">新機能の追加要望</option>
-        <option value="不具合・バグ報告">不具合・バグ報告</option>
-        <option value="デザイン・UI改善">デザイン・UI改善</option>
-        <option value="その他">その他</option>
-      </select>
+      <label>選択肢（カンマ「,」区切りで入力してください）</label>
+      <input type="text" id="poll-options" class="input-field" required placeholder="例: 絶対欲しい, あったら使う, 必要ない">
     </div>
-
-    <div class="form-group">
-      <label for="message">内容（必須）</label>
-      <textarea id="message" name="要望内容" rows="6" required placeholder="追加してほしい機能や、改善してほしいところを具体的に書いてもらえると嬉しいです！"></textarea>
-    </div>
-
-    <button type="submit" class="submit-btn">匿名で送信する</button>
+    <button type="submit" class="submit-btn" id="submit-btn">新しい投票・アンケートを作成</button>
   </form>
+
+  <div id="polls-list" class="poll-container">
+    <p style="color:#999; text-align:center;">読み込み中...</p>
+  </div>
 </div>
 
-<style>
-  /* 要望・改善箱の専用スタイリング */
-  .anonymous-suggestion-box {
-    max-width: 600px;
-    margin: 20px auto;
-    padding: 25px;
-    background-color: #fafafa;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-  }
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-  .suggestion-title {
-    margin-top: 0;
-    margin-bottom: 15px;
-    font-size: 1.25em;
-    color: #990000; /* 2chの伝統的な赤系アクセント */
-    border-bottom: 2px solid #990000;
-    padding-bottom: 5px;
-    font-weight: bold;
-  }
+  // 提供されたFirebase設定
+  const firebaseConfig = {
+    apiKey: "AIzaSyBCQArL0Q1wDveRywCpet5Nor3PuRYt7fM",
+    authDomain: "sabopennet.firebaseapp.com",
+    projectId: "sabopennet",
+    storageBucket: "sabopennet.firebasestorage.app",
+    messagingSenderId: "284308308452",
+    appId: "1:284308308452:web:e36dd991e55a0e60e4c7f1",
+    measurementId: "G-K17XRK5KRN"
+  };
 
-  .suggestion-desc {
-    font-size: 0.85em;
-    color: #555;
-    line-height: 1.6;
-    margin-bottom: 25px;
-  }
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const pollsCollection = collection(db, "user_polls"); // 保存先コレクション
+  const q = query(pollsCollection, orderBy("createdAt", "desc"));
 
-  .suggestion-desc .highlight {
-    display: block;
-    margin-top: 5px;
-    color: #d32f2f;
-    font-weight: bold;
-  }
+  // 自分がどのアンケートにどの選択肢で投票したかを記録する履歴
+  // 構造: { "アンケートID": 選択肢のインデックス番号 }
+  let myVotes = JSON.parse(localStorage.getItem('myPollVotes')) || {};
 
-  .form-group {
-    margin-bottom: 20px;
-  }
+  // データベースからリアルタイム受信
+  onSnapshot(q, (snapshot) => {
+    const listEl = document.getElementById('polls-list');
+    listEl.innerHTML = '';
 
-  .form-group label {
-    display: block;
-    margin-bottom: 7px;
-    font-size: 0.9em;
-    font-weight: bold;
-    color: #333;
-  }
+    if (snapshot.empty) {
+      listEl.innerHTML = '<p style="color:#999; text-align:center;">まだ投票はありません。新しい議題を投稿してみましょう！</p>';
+      return;
+    }
 
-  .form-group input,
-  .form-group select,
-  .form-group textarea {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    box-sizing: border-box;
-    font-family: inherit;
-    font-size: 0.95em;
-    background-color: #fff;
-    transition: border-color 0.2s;
-  }
+    snapshot.forEach((docSnap) => {
+      const poll = docSnap.data();
+      const id = docSnap.id;
+      
+      const options = poll.options || [];
+      const votes = poll.votes || new Array(options.length).fill(0);
+      
+      // 合計投票数の算出
+      const totalVotes = votes.reduce((a, b) => a + b, 0);
 
-  .form-group input:focus,
-  .form-group select:focus,
-  .form-group textarea:focus {
-    border-color: #990000;
-    outline: none;
-  }
+      // 日付のパース
+      let dateStr = "";
+      if (poll.createdAt) {
+        const date = poll.createdAt.toDate();
+        dateStr = `${date.getFullYear()}/${date.getMonth()+1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+      }
 
-  .form-group textarea {
-    resize: vertical;
-    min-height: 100px;
-  }
+      // 各アンケート（議題）の枠を作成
+      const pollEl = document.createElement('div');
+      pollEl.className = 'poll-item';
+      
+      let optionsHTML = '';
+      options.forEach((opt, idx) => {
+        const optVotes = votes[idx] || 0;
+        // パーセンテージ計算
+        const percent = totalVotes > 0 ? Math.round((optVotes / totalVotes) * 100) : 0;
+        
+        // 自分が投票した項目かチェック
+        const isMyVote = myVotes[id] === idx;
+        const wrapperClass = isMyVote ? "poll-option-wrapper voted" : "poll-option-wrapper";
 
-  .submit-btn {
-    display: block;
-    width: 100%;
-    padding: 12px;
-    background-color: #0044cc; /* 送信は目立つ青 */
-    color: #ffffff;
-    border: none;
-    border-radius: 3px;
-    font-size: 1em;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
+        optionsHTML += `
+          <div class="${wrapperClass}" onclick="castVote('${id}', ${idx})">
+            <div class="poll-bar" style="width: ${percent}%"></div>
+            <div class="poll-option-clickarea">
+              <span class="vote-text">${isMyVote ? '🔵 ' : ''}${escapeHTML(opt)}</span>
+              <span class="vote-count">${optVotes}票 (${percent}%)</span>
+            </div>
+          </div>
+        `;
+      });
 
-  .submit-btn:hover {
-    background-color: #0033aa;
+      pollEl.innerHTML = `
+        <div class="poll-question">📊 ${escapeHTML(poll.title)}</div>
+        <div class="poll-meta">提案日時: ${dateStr} | 総投票数: ${totalVotes}票</div>
+        <div class="poll-options-box">${optionsHTML}</div>
+      `;
+      listEl.appendChild(pollEl);
+    });
+  });
+
+  // アンケート新規作成処理
+  document.getElementById('poll-create-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+
+    const titleInput = document.getElementById('poll-title').value;
+    const optionsInput = document.getElementById('poll-options').value;
+
+    // カンマ区切りの文字列を配列に変換し、前後の不要な空白を削除
+    const optionsArray = optionsInput.split(',').map(o => o.trim()).filter(o => o !== "");
+
+    if (optionsArray.length < 2) {
+      alert("選択肢は2つ以上入力してください（例: はい, いいえ）");
+      btn.disabled = false;
+      return;
+    }
+
+    try {
+      await addDoc(pollsCollection, {
+        title: titleInput,
+        options: optionsArray,
+        votes: new Array(optionsArray.length).fill(0), // 各選択肢の票数を0で初期化
+        createdAt: serverTimestamp()
+      });
+      this.reset();
+    } catch (error) {
+      console.error(error);
+      alert("データベース登録に失敗しました。Firestoreの設定を確認してください。");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // 投票実行・上書きトグル処理
+  window.castVote = async function(pollId, optionIndex) {
+    const pollRef = doc(db, "user_polls", pollId);
+    
+    // Firestore上の最新状態を一度読み込むのではなく、安全にSnapshot更新ロジックを回すため、
+    // 現在クライアントに表示されているデータ構造をベースに増減を計算
+    // （厳密なトランザクションではありませんが、個人掲示板レベルの競合なら十分機能します）
+    
+    onSnapshot(pollRef, async (docSnap) => {
+      if (!docSnap.exists()) return;
+      const data = docSnap.data();
+      let currentVotes = [...data.votes];
+
+      const previousVoteIdx = myVotes[pollId];
+
+      if (previousVoteIdx === optionIndex) {
+        // 同じ選択肢をもう一度クリックした場合：投票を取り消す
+        currentVotes[optionIndex] = Math.max(0, currentVotes[optionIndex] - 1);
+        delete myVotes[pollId];
+      } else {
+        // 別の選択肢に変える、または初めての投票の場合
+        if (previousVoteIdx !== undefined) {
+          // 以前の投票をマイナス1する（上書き変更）
+          currentVotes[previousVoteIdx] = Math.max(0, currentVotes[previousVoteIdx] - 1);
+        }
+        // 新しい選択肢をプラス1する
+        currentVotes[optionIndex] = (currentVotes[optionIndex] || 0) + 1;
+        myVotes[pollId] = optionIndex;
+      }
+
+      // ローカルストレージに自分の投票状況を上書き保存
+      localStorage.setItem('myPollVotes', JSON.stringify(myVotes));
+
+      // データベースを更新
+      try {
+        await updateDoc(pollRef, { votes: currentVotes });
+      } catch (e) {
+        console.error(e);
+      }
+    }, { onlyOnce: true }); // イベント発火時の1回のみ実行させてループを防ぐ
+  };
+
+  function escapeHTML(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
-</style>
+</script>
+
+</body>
+</html>
