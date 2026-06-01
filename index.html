@@ -1,5 +1,32 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>要望・改善 掲示板</title>
+  <style>
+    /* 掲示板のデザイン（前回と同じです） */
+    .simple-board { max-width: 600px; margin: 20px auto; font-family: sans-serif; color: #333; }
+    .board-title { border-bottom: 2px solid #0056b3; padding-bottom: 10px; margin-bottom: 20px; }
+    .board-form { background: #f4f7f6; padding: 15px; border-radius: 8px; margin-bottom: 30px; }
+    .form-row { margin-bottom: 10px; }
+    .name-input, .message-input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-family: inherit; }
+    .message-input { resize: vertical; }
+    .submit-btn { background-color: #0056b3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+    .submit-btn:hover { background-color: #004494; }
+    
+    .post { border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 15px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .post-header { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.9em; color: #666; }
+    .post-name { font-weight: bold; color: #222; }
+    .post-body { margin-bottom: 15px; line-height: 1.5; white-space: pre-wrap; }
+    .vote-btn { background: #eef2f5; border: 1px solid #ccd6dd; padding: 6px 12px; border-radius: 20px; cursor: pointer; color: #0056b3; font-weight: bold; transition: 0.2s; }
+    .vote-btn:hover { background: #e1e8ed; }
+  </style>
+</head>
+<body>
+
 <div class="simple-board">
-  <h3 class="board-title">改善してほしいところ(仮)</h3>
+  <h3 class="board-title">要望・改善 掲示板</h3>
   
   <form id="post-form" class="board-form">
     <div class="form-row">
@@ -8,177 +35,120 @@
     <div class="form-row">
       <textarea id="post-message" rows="3" required placeholder="追加してほしい機能などを書いてください..." class="message-input"></textarea>
     </div>
-    <button type="submit" class="submit-btn">投稿する</button>
+    <button type="submit" class="submit-btn" id="submit-btn">投稿する</button>
   </form>
 
   <div id="board-posts" class="posts-container">
-    </div>
+    <p style="color:#999; text-align:center;">読み込み中...</p>
+  </div>
 </div>
 
-<style>
-  /* 掲示板のデザイン */
-  .simple-board {
-    max-width: 600px;
-    margin: 20px auto;
-    font-family: sans-serif;
-    color: #333;
-  }
-  .board-title {
-    border-bottom: 2px solid #0056b3;
-    padding-bottom: 10px;
-    margin-bottom: 20px;
-  }
-  .board-form {
-    background: #f4f7f6;
-    padding: 15px;
-    border-radius: 8px;
-    margin-bottom: 30px;
-  }
-  .form-row {
-    margin-bottom: 10px;
-  }
-  .name-input, .message-input {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    box-sizing: border-box;
-    font-family: inherit;
-  }
-  .message-input {
-    resize: vertical;
-  }
-  .submit-btn {
-    background-color: #0056b3;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-  }
-  .submit-btn:hover {
-    background-color: #004494;
-  }
-  
-  /* 投稿内容のデザイン */
-  .post {
-    border: 1px solid #ddd;
-    padding: 15px;
-    border-radius: 8px;
-    margin-bottom: 15px;
-    background: #fff;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-  }
-  .post-header {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 10px;
-    font-size: 0.9em;
-    color: #666;
-  }
-  .post-name {
-    font-weight: bold;
-    color: #222;
-  }
-  .post-body {
-    margin-bottom: 15px;
-    line-height: 1.5;
-    white-space: pre-wrap; /* 改行を反映する */
-  }
-  .vote-btn {
-    background: #eef2f5;
-    border: 1px solid #ccd6dd;
-    padding: 6px 12px;
-    border-radius: 20px;
-    cursor: pointer;
-    color: #0056b3;
-    font-weight: bold;
-    transition: 0.2s;
-  }
-  .vote-btn:hover {
-    background: #e1e8ed;
-  }
-</style>
+<script type="module">
+  // 1. Firebaseの基本機能とFirestore（データベース）をインポート
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-<script>
-  // 投稿データを保存する配列（ブラウザの保存領域から読み込み）
-  let posts = JSON.parse(localStorage.getItem('simpleBoardData')) || [];
+  // 2. 教えてもらった設定コード
+  const firebaseConfig = {
+    apiKey: "AIzaSyBCQArL0Q1wDveRywCpet5Nor3PuRYt7fM",
+    authDomain: "sabopennet.firebaseapp.com",
+    projectId: "sabopennet",
+    storageBucket: "sabopennet.firebasestorage.app",
+    messagingSenderId: "284308308452",
+    appId: "1:284308308452:web:e36dd991e55a0e60e4c7f1",
+    measurementId: "G-K17XRK5KRN"
+  };
 
-  // 投稿を画面に表示する関数
-  function renderPosts() {
+  // 3. Firebaseとデータベース（Firestore）の初期化
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // 4. データベースからリアルタイムで投稿を読み込む
+  const postsCollection = collection(db, "posts");
+  const q = query(postsCollection, orderBy("createdAt", "desc")); // 新しい順に並べる
+
+  onSnapshot(q, (snapshot) => {
     const board = document.getElementById('board-posts');
-    board.innerHTML = ''; // 一旦クリア
+    board.innerHTML = ''; 
 
-    if (posts.length === 0) {
+    if (snapshot.empty) {
       board.innerHTML = '<p style="color:#999; text-align:center;">まだ投稿はありません。</p>';
       return;
     }
 
-    posts.forEach((post, index) => {
+    snapshot.forEach((docSnap) => {
+      const post = docSnap.data();
+      const id = docSnap.id; // Firestoreが自動で作るID
+
+      // 投稿日時のフォーマット
+      let dateStr = "日付取得中...";
+      if (post.createdAt) {
+        const date = post.createdAt.toDate();
+        dateStr = `${date.getFullYear()}/${date.getMonth()+1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+      }
+
+      // HTMLの作成
       const postEl = document.createElement('div');
       postEl.className = 'post';
       postEl.innerHTML = `
         <div class="post-header">
           <span class="post-name">${escapeHTML(post.name) || '名無しさん'}</span>
-          <span class="post-date">${post.date}</span>
+          <span class="post-date">${dateStr}</span>
         </div>
         <div class="post-body">${escapeHTML(post.message)}</div>
         <div class="post-footer">
-          <button class="vote-btn" onclick="vote(${index})">
+          <button class="vote-btn" onclick="vote('${id}', ${post.votes})">
             👍 賛成・いいね <span class="vote-count">${post.votes}</span>
           </button>
         </div>
       `;
       board.appendChild(postEl);
     });
-  }
+  });
 
-  // 投稿ボタンが押された時の処理
-  document.getElementById('post-form').addEventListener('submit', function(e) {
-    e.preventDefault(); // 画面の更新を防ぐ
+  // 5. 投稿ボタンが押された時の処理（データベースに保存）
+  document.getElementById('post-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true; // 連打防止
     
     const nameInput = document.getElementById('post-name').value;
     const messageInput = document.getElementById('post-message').value;
-    
-    // 現在の日付を取得
-    const now = new Date();
-    const dateStr = `${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()} ${now.getHours()}:${now.getMinutes()}`;
 
-    // 新しい投稿データを一番上に追加
-    posts.unshift({
-      name: nameInput,
-      message: messageInput,
-      date: dateStr,
-      votes: 0
-    });
-
-    saveAndRender();
-    this.reset(); // フォームを空にする
+    try {
+      await addDoc(postsCollection, {
+        name: nameInput,
+        message: messageInput,
+        votes: 0,
+        createdAt: serverTimestamp() // サーバーの正確な時間を記録
+      });
+      this.reset(); // フォームを空にする
+    } catch (error) {
+      console.error("エラー:", error);
+      alert("投稿に失敗しました。");
+    } finally {
+      btn.disabled = false;
+    }
   });
 
-  // 投票（いいね）ボタンが押された時の処理
-  function vote(index) {
-    posts[index].votes += 1; // 票数を1増やす
-    saveAndRender();
-  }
+  // 6. 投票（いいね）ボタンの処理
+  window.vote = async function(id, currentVotes) {
+    const postRef = doc(db, "posts", id);
+    try {
+      await updateDoc(postRef, {
+        votes: currentVotes + 1
+      });
+    } catch (error) {
+      console.error("エラー:", error);
+    }
+  };
 
-  // データを保存して画面を更新する関数
-  function saveAndRender() {
-    // ブラウザのLocalStorageに保存（リロードしても消えないように）
-    localStorage.setItem('simpleBoardData', JSON.stringify(posts));
-    renderPosts();
-  }
-
-  // セキュリティ対策：HTMLタグを無効化する関数
+  // セキュリティ対策（前回と同じ）
   function escapeHTML(str) {
-    return str.replace(/&/g, '&amp;')
-              .replace(/</g, '&lt;')
-              .replace(/>/g, '&gt;')
-              .replace(/"/g, '&quot;')
-              .replace(/'/g, '&#39;');
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
-
-  // 最初に画面を開いた時に投稿を表示
-  renderPosts();
 </script>
+
+</body>
+</html>
