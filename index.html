@@ -18,6 +18,7 @@
     textarea.input-field { resize: vertical; min-height: 80px; }
     .submit-btn { background-color: #0044cc; color: white; border: none; padding: 12px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 1em; transition: 0.2s; }
     .submit-btn:hover { background-color: #0033aa; }
+    .submit-btn:disabled { background-color: #999; cursor: not-allowed; }
 
     /* 投稿カードのデザイン */
     .poll-container { border-top: 2px dashed #ccc; padding-top: 20px; }
@@ -63,6 +64,7 @@
     アンケートの選択肢を入力すると、他のユーザーから投票を受け付けることができます。
   </p>
   
+  <!-- 投稿フォーム -->
   <form id="poll-create-form" class="poll-form">
     <div class="form-group">
       <label for="poll-name">お名前（任意）</label>
@@ -87,6 +89,7 @@
     <button type="submit" class="submit-btn" id="submit-btn">投稿する</button>
   </form>
 
+  <!-- 投稿一覧 -->
   <div id="polls-list" class="poll-container">
     <p style="color:#999; text-align:center;">読み込み中...</p>
   </div>
@@ -96,6 +99,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
   import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
+  // Firebase設定
   const firebaseConfig = {
     apiKey: "AIzaSyBCQArL0Q1wDveRywCpet5Nor3PuRYt7fM",
     authDomain: "sabopennet.firebaseapp.com",
@@ -113,7 +117,7 @@
 
   let myVotes = JSON.parse(localStorage.getItem('myPollVotes')) || {};
 
-  // リアルタイム受信
+  // リアルタイム受信（画面表示）
   onSnapshot(q, (snapshot) => {
     const listEl = document.getElementById('polls-list');
     listEl.innerHTML = '';
@@ -143,7 +147,7 @@
       const pollEl = document.createElement('div');
       pollEl.className = 'poll-item';
       
-      // 【変更】選択肢がある場合だけ投票UIを作成する
+      // 選択肢がある場合だけ投票UIを作成
       let optionsHTML = '';
       if (options.length > 0) {
         optionsHTML += '<div class="poll-options-box">';
@@ -166,7 +170,6 @@
         optionsHTML += '</div>';
       }
 
-      // 投票がある時だけ「総投票数」を表示する
       const voteMeta = options.length > 0 ? ` | 総投票数: ${totalVotes}票` : '';
 
       pollEl.innerHTML = `
@@ -179,42 +182,61 @@
     });
   });
 
-  // 新規投稿処理
+  // 新規投稿処理（Firebase保存 ＋ Formspreeメール送信）
   document.getElementById('poll-create-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     const btn = document.getElementById('submit-btn');
     btn.disabled = true;
+    btn.innerText = "送信中...";
 
     const nameInput = document.getElementById('poll-name').value.trim();
     const titleInput = document.getElementById('poll-title').value.trim();
     const bodyInput = document.getElementById('poll-body').value.trim();
     const optionsInput = document.getElementById('poll-options').value;
+    const authorName = nameInput || "名無しさん";
 
-    // 【変更】空欄の場合は空の配列にする
     const optionsArray = optionsInput ? optionsInput.split(',').map(o => o.trim()).filter(o => o !== "") : [];
 
-    // 選択肢が1つだけ入力されている場合はエラーにする（0個か、2個以上ならOK）
     if (optionsArray.length === 1) {
-      alert("アンケートを作成する場合は、選択肢を2つ以上入力してください（例: 賛成, 反対）。");
+      alert("アンケートを作成する場合は、選択肢を2つ以上入力してください。");
       btn.disabled = false;
+      btn.innerText = "投稿する";
       return;
     }
 
     try {
+      // 1. Firebase（公開掲示板）にデータを保存
       await addDoc(pollsCollection, {
-        name: nameInput || "名無しさん",
+        name: authorName,
         title: titleInput,
         body: bodyInput,
         options: optionsArray,
-        votes: optionsArray.length > 0 ? new Array(optionsArray.length).fill(0) : [], // 投票枠も0個または必要数用意する
+        votes: optionsArray.length > 0 ? new Array(optionsArray.length).fill(0) : [],
         createdAt: serverTimestamp()
       });
+
+      // 2. Formspree（メール通知）へデータを裏側で送信
+      await fetch("https://formspree.io/f/xnjrejan", {
+        method: "POST",
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          "お名前": authorName,
+          "タイトル": titleInput,
+          "詳しい内容": bodyInput || "（入力なし）",
+          "アンケート選択肢": optionsArray.length > 0 ? optionsArray.join(" / ") : "なし"
+        })
+      });
+
       this.reset();
     } catch (error) {
       console.error(error);
-      alert("データベース登録に失敗しました。");
+      alert("投稿またはメール送信に失敗しました。");
     } finally {
       btn.disabled = false;
+      btn.innerText = "投稿する";
     }
   });
 
